@@ -27,21 +27,21 @@ int main(int argc, char * argv[]) {  // What is the type of argv?
   char const * pcc2 = c;  // What is the type of pcc2?
 
   // For each of the following, why is the assignment:
-  *pcc = '7';  // invalid?
-  pcc = *pcp;  // valid?
-  pcc = argv[0];  // valid?
+  *pcc = '7';  // invalid? pcc is const pointer to char, so *pcc is a char that cannot be modified.
+  pcc = *pcp;  // valid?   pcp is a pointer to a pointer to char, so *pcp is a pointer to char, which can be assigned to pcc.
+  pcc = argv[0];  // valid? argv is an array of pointers to char, so argv[0] is a pointer to char, which can be assigned to pcc.
 
   char * const cp = c;  // cp is a const pointer to char
-  // For each of the following, why is the assignment:
-  cp = *pcp;  // invalid?
-  cp = *argv;  // invalid?
-  *cp = '!';  // valid?
+  // For each of the following, why is the assignment: 
+  cp = *pcp;  // invalid? cp is a const pointer to char, so cp itself cannot be modified to point to something else.
+  cp = *argv;  // invalid?  argv is an array of pointers to char, so *argv is a pointer to char, which cannot be assigned to cp because cp is a const pointer.
+  *cp = '!';  // valid? cp is a const pointer to char, so *cp is a char that can be modified.
 
   const char * const cpc = c;  // cpc is a const pointer to char const
   // For each of the following, why is the assignment:
-  cpc = *pcp;  // invalid?
-  cpc = argv[0];  // invalid?
-  *cpc = '@';  // invalid?
+  cpc = *pcp;  // invalid?  cpc is a const pointer to char const, so cpc itself cannot be modified to point to something else.
+  cpc = argv[0];  // invalid? argv is an array of pointers to char, so argv[0] is a pointer to char, which cannot be assigned to cpc because cpc is a const pointer.
+  *cpc = '@';  // invalid? cpc is a const pointer to char const, so *cpc is a char constant that cannot be modified.
 
   return 0;
 }
