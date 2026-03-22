@@ -24,23 +24,28 @@
 #include "./util.h"
 
 // Function prototypes
-static __attribute__((always_inline)) void merge_i(data_t* A, int p, int q, int r);
-static __attribute__((always_inline)) void copy_i(data_t* source, data_t* dest, int n);
-
+void isort(data_t* begin, data_t* end);
+static __attribute__((always_inline)) void merge_c(data_t* A, int p, int q, int r);
+static __attribute__((always_inline)) void copy_c(data_t* source, data_t* dest, int n);
+#define THRESHOLD 32
 // A basic merge sort routine that sorts the subarray A[p..r]
-void sort_i(data_t* A, int p, int r) {
+void sort_c(data_t* A, int p, int r) {
   assert(A);
   if (p < r) {
+    if(r - p < THRESHOLD) {
+      isort(A + p, A + r); // pass pointers, not indices
+      return;
+    }
     int q = (p + r) / 2;
-    sort_i(A, p, q);
-    sort_i(A, q + 1, r);
-    merge_i(A, p, q, r);
+    sort_c(A, p, q);
+    sort_c(A, q + 1, r);
+    merge_c(A, p, q, r);
   }
 }
 
 // A merge routine. Merges the sub-arrays A [p..q] and A [q + 1..r].
 // Uses two arrays 'left' and 'right' in the merge operation.
-static __attribute__((always_inline)) void merge_i(data_t* A, int p, int q, int r) {
+static __attribute__((always_inline)) void merge_c(data_t* A, int p, int q, int r) {
   assert(A);
   assert(p <= q);
   assert((q + 1) <= r);
@@ -56,8 +61,8 @@ static __attribute__((always_inline)) void merge_i(data_t* A, int p, int q, int 
     return;
   }
 
-  copy_i(&(A[p]), left, n1);
-  copy_i(&(A[q + 1]), right, n2);
+  copy_c(&(A[p]), left, n1);
+  copy_c(&(A[q + 1]), right, n2);
   left[n1] = UINT_MAX;
   right[n2] = UINT_MAX;
 
@@ -77,7 +82,7 @@ static __attribute__((always_inline)) void merge_i(data_t* A, int p, int q, int 
   mem_free(&right);
 }
 
-static __attribute__((always_inline)) void copy_i(data_t* source, data_t* dest, int n) {
+static __attribute__((always_inline)) void copy_c(data_t* source, data_t* dest, int n) {
   assert(dest);
   assert(source);
 
