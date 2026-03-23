@@ -14,7 +14,10 @@
 
 int fib(int n) {
   if (n < 2) return n;
-
+  if(n <= GRAIN) {
+    // Base case for small n: compute serially to avoid overhead.
+    return fib(n - 1) + fib(n - 2);
+  }
   int x = cilk_spawn fib(n - 1);
   int y = fib(n - 2);
   cilk_sync;
