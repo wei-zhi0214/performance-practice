@@ -26,7 +26,7 @@
 // TODO (Sec 3.1): uncomment when parallelizing
  #include <cilk/cilk.h>
 
-// TODO (Sec 3.3): uncomment when implementing reducer
+// TODO (Sec 3.3): cilk/reducer.h is Intel Cilk Plus only -- not in OpenCilk 2.1
 // #include <cilk/reducer.h>
 
 // ---------------------------------------------------------------------------
@@ -180,33 +180,45 @@ BoardList run_queens(void) {
 }
 
 // ---------------------------------------------------------------------------
+// Sec 3.3: Reducer implementation -- NOTE: OpenCilk 2.1 does NOT ship
+// cilk/reducer.h (Intel Cilk Plus API).  The three monoid functions below
+// are correct and would plug straight into CILK_C_INIT_REDUCER if the header
+// were available.  On OpenCilk we keep using the Section-3.2 temp-list
+// approach, which is functionally equivalent.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // Reducer stubs (Sec 3.3)
 // ---------------------------------------------------------------------------
 
 // TODO (Sec 3.3, step 2): implement these three functions.
 
-// void board_list_reduce(void* key, void* left, void* right) {
-//   // Cast to BoardList* and call merge_lists.
-// }
+void board_list_reduce(void* key, void* left, void* right) {
+   // Cast to BoardList* and call merge_lists.
+   merge_lists((BoardList*)left, (BoardList*)right);
 
-// void board_list_identity(void* key, void* value) {
-//   // Set *value to the identity BoardList {NULL, NULL, 0}.
-// }
+}
 
-// void board_list_destroy(void* key, void* value) {
-//   // Free nodes; hint: call delete_nodes.
-// }
+void board_list_identity(void* key, void* value) {
+   // Set *value to the identity BoardList {NULL, NULL, 0}.
+   *(BoardList*)value = (BoardList){ .head = NULL, .tail = NULL, .size = 0 };
+}
+
+void board_list_destroy(void* key, void* value) {
+   // Free nodes; hint: call delete_nodes.
+    delete_nodes((BoardList*)value);
+}
 
 // TODO (Sec 3.3, step 3): instantiate the reducer type
 // typedef CILK_C_DECLARE_REDUCER(BoardList) BoardListReducer;
 
 // TODO (Sec 3.3, step 4): declare a global reducer (comment in when ready)
 // BoardListReducer board_reducer =
-//   CILK_C_INIT_REDUCER(BoardList,
-//                        board_list_reduce,
-//                        board_list_identity,
-//                        board_list_destroy,
-//                        (BoardList){ .head = NULL, .tail = NULL, .size = 0 });
+//    CILK_C_INIT_REDUCER(BoardList,
+//                         board_list_reduce,
+//                         board_list_identity,
+//                         board_list_destroy,
+//                         (BoardList){ .head = NULL, .tail = NULL, .size = 0 });
 
 // ---------------------------------------------------------------------------
 // main
