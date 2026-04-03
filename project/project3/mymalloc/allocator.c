@@ -32,6 +32,14 @@
 #define free(...) (USE_MY_FREE)
 #define realloc(...) (USE_MY_REALLOC)
 
+#define chunk_size (1 << 16) 
+
+typedef struct FreeNode {
+    struct FreeNode* next;
+} FreeNode;
+
+FreeNode* bin[13]; // 13 bins for sizes 32, 64, 128, ..., 131072
+
 // All blocks must have a specified minimum alignment.
 // The alignment requirement (from config.h) is >= 8 bytes.
 #ifndef ALIGNMENT
@@ -72,43 +80,74 @@ int my_check() {
 // calls are made.  Since this is a very simple implementation, we just
 // return success.
 int my_init() {
+  for (int i = 0; i < 13; i++) {
+    bin[i] = NULL;
+  }
   return 0;
 }
 
-//  malloc - Allocate a block by incrementing the brk pointer.
-//  Always allocate a block whose size is a multiple of the alignment.
-void* my_malloc(size_t size) {
-  // We allocate a little bit of extra memory so that we can store the
-  // size of the block we've allocated.  Take a look at realloc to see
-  // one example of a place where this can come in handy.
-  int aligned_size = ALIGN(size + SIZE_T_SIZE);
-
-  // Expands the heap by the given number of bytes and returns a pointer to
-  // the newly-allocated area.  This is a slow call, so you will want to
-  // make sure you don't wind up calling it on every malloc.
-  void* p = mem_sbrk(aligned_size);
-
-  if (p == (void*) - 1) {
-    // Whoops, an error of some sort occurred.  We return NULL to let
-    // the client code know that we weren't able to allocate memory.
-    return NULL;
-  } else {
-    // We store the size of the block we've allocated in the first
-    // SIZE_T_SIZE bytes.
-    *(size_t*)p = size;
-
-    // Then, we return a pointer to the rest of the block of memory,
-    // which is at least size bytes long.  We have to cast to uint8_t
-    // before we try any pointer arithmetic because voids have no size
-    // and so the compiler doesn't know how far to move the pointer.
-    // Since a uint8_t is always one byte, adding SIZE_T_SIZE after
-    // casting advances the pointer by SIZE_T_SIZE bytes.
-    return (void*)((char*)p + SIZE_T_SIZE);
-  }
+static inline int size_to_bin(size_t size) {
+    if (size <= 32) return 0;
+    // 找最小的 n 使得 32 << n >= size
+    // 等價於 ceil(log2(size)) - 5
+    int msb = 64 - __builtin_clzll(size - 1);  // ceil(log2(size))
+    int b = msb - 5;
+    if (b < 0) b = 0;
+    if (b > 12) b = 12;
+    return b;
 }
 
-// free - Freeing a block does nothing.
+//  malloc - Allocate a block using bin free lists with size header.
+void* my_malloc(size_t size) {
+  if (size == 0) return NULL;
+
+  // block size = header + data, rounded up to bin size
+  size_t needed = ALIGN(size + SIZE_T_SIZE);
+  int req_order = size_to_bin(needed);
+  size_t block_size = (size_t)32 << req_order;  // actual bin size
+
+  if (bin[req_order] != NULL) {
+    // Reuse a free block; header is at the block start
+    char* block = (char*)bin[req_order];
+    bin[req_order] = bin[req_order]->next;
+    *(size_t*)block = block_size;
+    return block + SIZE_T_SIZE;
+  }
+
+  // Grow heap: carve chunk into blocks of block_size
+  int num_blocks = (chunk_size + block_size - 1) / block_size;
+  size_t req_chunk_size = num_blocks * block_size;
+
+  void* p = mem_sbrk(req_chunk_size);
+  if (p == (void*)-1) return NULL;
+
+  char* blk = (char*)p;
+  for (int i = 0; i < num_blocks; i++) {
+    FreeNode* node = (FreeNode*)blk;
+    node->next = bin[req_order];
+    bin[req_order] = node;
+    blk += block_size;
+  }
+
+  // Pop one block off and return it
+  char* block = (char*)bin[req_order];
+  bin[req_order] = bin[req_order]->next;
+  *(size_t*)block = block_size;
+  return block + SIZE_T_SIZE;
+}
+
+// free - Return block to its bin using the header to find bin index.
 void my_free(void* ptr) {
+  if (ptr == NULL) return;
+
+  // Header is SIZE_T_SIZE bytes before the user pointer
+  char* block = (char*)ptr - SIZE_T_SIZE;
+  size_t block_size = *(size_t*)block;
+  int order = size_to_bin(block_size);
+
+  FreeNode* node = (FreeNode*)block;
+  node->next = bin[order];
+  bin[order] = node;
 }
 
 // realloc - Implemented simply in terms of malloc and free
