@@ -70,6 +70,35 @@ static void *alloc_large(void) {
     return p;
 }
 
+static void *alloc_aligned(size_t size) {
+    if (size == SMALL_SIZE)
+    {
+        if (small_free_list != NULL)
+        {
+            FreeNode *node = small_free_list;
+            small_free_list = node->next;
+            return (void *)node;
+        }
+        void *p = mem_sbrk(LARGE_SIZE);
+        if (p == (void *)-1)
+            return NULL;
+        // 後半段 32B 推進 free list
+        FreeNode *extra = (FreeNode *)(p + SMALL_SIZE);
+        extra->next = small_free_list;
+        small_free_list = extra;
+
+        // 回傳前半段
+        return p;
+    }
+    else if (size == LARGE_SIZE)
+    {
+        return alloc_large();
+    }
+    else
+    {
+        return NULL;
+    }
+}
 /* -------------------------------------------------------------------------
  * Public interface
  * ---------------------------------------------------------------------- */
@@ -92,18 +121,20 @@ int smart_init(void) {
  *   failure          -> NULL
  */
 void *smart_malloc(size_t size) {
-    if (size == 0) return NULL;
+    if (size == 0)
+        return NULL;
 
-    if (size <= SMALL_SIZE) {
-        void *p = alloc_small();
-        if (p == NULL) return NULL;
-        /* Tag the low bit to indicate a small block */
+    if (size <= SMALL_SIZE)
+    {
+        void *p = alloc_aligned(SMALL_SIZE); // ← 改這裡
+        if (p == NULL)
+            return NULL;
         return (void *)((uintptr_t)p | (uintptr_t)1);
     }
 
-    if (size <= LARGE_SIZE) {
-        void *p = alloc_large();
-        /* Low bit is 0 => large block (no tagging needed) */
+    if (size <= LARGE_SIZE)
+    {
+        void *p = alloc_aligned(LARGE_SIZE); // ← 改這裡
         return p;
     }
 
